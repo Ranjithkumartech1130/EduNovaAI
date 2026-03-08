@@ -1,4 +1,6 @@
-# 🚀 SkillGPS: AI-Powered Learning Path Generator (v3.2)
+#  EduNova — Intelligent Inclusive Learning Ecosystem&Adaptive AI Education for Every Ability
+
+
 
 ![Project Status](https://img.shields.io/badge/status-active-brightgreen)
 ![Build](https://img.shields.io/badge/build-passing-brightgreen)
@@ -13,13 +15,13 @@ A professional, modular learning platform that leverages AI to generate personal
 
 ## ✨ Features
 
-- 🗺️ **AI Learning Paths** — Personalized roadmaps generated with Google Gemini.
-- 💻 **Multi-Language IDE** — 17 languages with real code execution and professional terminal.
-- 🧠 **AI Algorithm Instructor (v3.2)** — **NEW!** Sophisticated logic checking that identifies mistakes and provides **instant fix suggestions** with reference code.
-- 🎤 **Voice Assistant** — Multilingual voice navigation for hands-free learning.
-- 📄 **AI Resume Builder** — Auto-generate professional resumes tailored to your learning profile.
-- 📊 **Progress Dashboards** — Visual tracking of your skills and accomplishments.
-- 🎭 **AI Mock Interview** — Native React assessment system with aptitude tests and coding challenges.
+-  **AI Learning Paths** — Personalized roadmaps generated with Google Gemini.
+-  **Multi-Language IDE** — 17 languages with real code execution and professional terminal.
+-  **AI Algorithm Instructor (v3.2)** — **NEW!** Sophisticated logic checking that identifies mistakes and provides **instant fix suggestions** with reference code.
+-  **Voice Assistant** — Multilingual voice navigation for hands-free learning.
+-  **AI Resume Builder** — Auto-generate professional resumes tailored to your learning profile.
+-  **Progress Dashboards** — Visual tracking of your skills and accomplishments.
+-  **AI Mock Interview** — Native React assessment system with aptitude tests and coding challenges.
 
 ---
 
@@ -41,7 +43,7 @@ SkillGPS/
 │                  port 5173                        │
 │                                                   │
 │  ┌─────────┐ ┌──────────┐ ┌────────────────────┐ │
-│  │Dashboard │ │ 🧠 Algo  │ │  🎭 Mock Interview │ │
+│  │Dashboard │ │  Algo  │ │   Mock Interview │ │
 │  │ Overview │ │ Helper   │ │  (Native React)    │ │
 │  └────┬─────┘ └───┬──┬───┘ └────────┬───────────┘ │
 │       │           │  │               │             │
@@ -61,7 +63,7 @@ SkillGPS/
 
 ---
 
-## 🚀 How to Run
+##  How to Run
 
 ### Step 1: Install Dependencies
 
@@ -85,32 +87,32 @@ You need **4 terminals** running concurrently:
    cd "LEARNING PATH GENERATOR/LEARNING PATH GENERATOR"
    python app.py
    ```
-   > 🚀 Running on **http://localhost:5005**
+   >  Running on **http://localhost:5005**
 
 2. **Interview Engine**
    ```bash
    cd Ai-Interview-Tester/backend
    npm start
    ```
-   > 🚀 Running on **http://localhost:5000**
+   >  Running on **http://localhost:5000**
 
 3. **SkillGPS Backend**
    ```bash
    cd backend
    node index.js
    ```
-   > 🚀 Running on **http://localhost:5001**
+   >  Running on **http://localhost:5001**
 
 4. **SkillGPS Frontend**
    ```bash
    cd client
    npm run dev
    ```
-   > 🚀 Running on **http://localhost:5173**
+   >  Running on **http://localhost:5173**
 
 ---
 
-## 🧠 AI Algorithm Instructor (v3.2 Update)
+##  AI Algorithm Instructor (v3.2 Update)
 
 The integrated AI Instructor is now more powerful than ever. Located inside the IDE under the **"AI Algorithm"** button, it provides:
 
@@ -156,4 +158,3 @@ The integrated AI Instructor is now more powerful than ever. Located inside the 
 
 ---
 
-*Built with ❤️ by Ranjith Kumar & SkillGPS Team*
