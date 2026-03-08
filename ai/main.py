@@ -16,7 +16,8 @@ from dotenv import load_dotenv
 import textwrap
 import subprocess
 
-load_dotenv()
+env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+load_dotenv(env_path)
 
 app = FastAPI(title="BugBuster AI Service")
 
@@ -39,19 +40,19 @@ if not GEMINI_API_KEY:
     print("Error: GEMINI_API_KEY not found in environment variables. Please set it in your .env file.")
 else:
     genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash")
+model = genai.GenerativeModel("gemini-pro")
 
 class UserProfile(BaseModel):
-    experience_level: str
-    skills: List[str]
-    learning_goals: List[str]
-    interests: List[str]
-    time_commitment: str
-    learning_style: str
-    difficulty_preference: str
+    experience_level: str = "Beginner"
+    skills: List[str] = []
+    learning_goals: List[str] = []
+    interests: List[str] = []
+    time_commitment: str = "5-10 hours/week"
+    learning_style: str = "Visual"
+    difficulty_preference: str = "Easy"
 
 class PathRequest(BaseModel):
-    user_profile: UserProfile
+    user_profile: UserProfile = UserProfile()
     goal: str
     additional_skills: Optional[str] = ""
     preferences: Optional[str] = ""
@@ -66,769 +67,54 @@ class TaskRequest(BaseModel):
 
 @app.post("/generate-path")
 async def generate_path(request: PathRequest):
+    """Generate learning path using web scraping + curated database. No API key needed."""
     try:
-        skill_strategy = ("Leveraging your existing expertise to fast-track your progress." 
-                         if request.use_previous_skills else "Starting from foundational principles for a solid base.")
+        from curriculum_builder import generate_curriculum
         
-        prompt = f"""
-        Act as a Principal Engineer and Career Architect. Generate a RIGOROUSLY ACCURATE and hyper-specific learning path for becoming a: {request.goal}
-
-        USER CONTEXT:
-        - Experience Level: {request.user_profile.experience_level}
-        - Current Skills: {', '.join(request.user_profile.skills)}
-        - Learning Strategy: {skill_strategy}
-
-        CRITICAL REQUIREMENTS:
-        1. You MUST provide SPECIFIC, REAL URLs - no generic Google/YouTube search links
-        2. Include actual course names, GitHub repositories, official documentation sites
-        3. For {request.goal}, research and provide the TOP industry-standard resources
-        4. Include at least 8-10 specific resources in the Global Master Resources table
-        5. Each learning phase should have 5-7 specific, clickable resources with real URLs
-        6. Add specialized learning tracks if relevant to {request.goal}
-        7. Include practice platforms, communities, and career resources specific to {request.goal}
-
-        EXAMPLES OF GOOD RESOURCES (adapt to {request.goal}):
-        - For ML: Coursera ML Specialization, Fast.ai, Kaggle, Papers with Code, scikit-learn docs
-        - For Web Dev: MDN Web Docs, FreeCodeCamp, The Odin Project, web.dev, specific framework docs
-        - For Data Science: Kaggle Learn, DataCamp, Mode Analytics SQL Tutorial, Pandas docs
-        - For Cloud: AWS/GCP/Azure official tutorials, Cloud Academy, A Cloud Guru
-        
-        OUTPUT FORMAT (Markdown) - FOLLOW THIS EXACT STRUCTURE:
-
-        ### 🚀 Your Personalized Curriculum: {request.goal}
-        
-        [Write a motivational 2-3 sentence intro referencing their {request.user_profile.experience_level} level and how this path will accelerate their journey to {request.goal}]
-
-        ### 📚 Essential {request.goal} Resources
-        
-        | 🎓 Resource / Course | 🔗 Direct Link | 💡 Why This Matters |
-        | :--- | :--- | :--- |
-        | **[Specific Course/Platform Name]** | [Real URL with https://] | [Specific benefit for {request.goal}] |
-        | **[Another Specific Resource]** | [Real URL] | [Why it's essential] |
-        | **[GitHub Repo or Tool]** | [Real URL] | [What you'll learn] |
-        [Continue with 8-10 total resources - ALL with real, working URLs]
-
-        ### 🗂️ Detailed Learning Modules
-        
-        #### 1. Phase 1: Foundations & Core Concepts (Weeks 1-8)
-        *   **Focus:** [Specific foundational topics for {request.goal}]
-        *   **📖 Key Resources:**
-            *   [Specific Resource Name](https://real-url.com) - Detailed explanation of why needed
-            *   [Another Resource](https://real-url.com) - What you'll learn from this
-            *   [Third Resource](https://real-url.com) - How it builds your foundation
-            *   [Fourth Resource](https://real-url.com) - Practical application
-            *   [Fifth Resource](https://real-url.com) - Additional context
-        *   **🏁 Milestone Project:** [Specific project idea with technologies to use]
-        
-        #### 2. Phase 2: Core Expertise & Advanced Skills (Weeks 9-16)
-        *   **Focus:** [Intermediate to advanced {request.goal} concepts]
-        *   **📖 Key Resources:**
-            *   [Specific Resource](https://real-url.com) - Why this matters for Phase 2
-            *   [Another Resource](https://real-url.com) - Advanced concepts covered
-            *   [Third Resource](https://real-url.com) - Practical implementation
-            *   [Fourth Resource](https://real-url.com) - Industry best practices
-            *   [Fifth Resource](https://real-url.com) - Real-world applications
-        *   **🏁 Milestone Project:** [More complex project description]
-
-        #### 3. Phase 3: Advanced Mastery & Specialization (Weeks 17-24)
-        *   **Focus:** [Production-level skills and specializations for {request.goal}]
-        *   **📖 Key Resources:**
-            *   [Advanced Resource](https://real-url.com) - Expert-level content
-            *   [Specialization Resource](https://real-url.com) - Deep dive topic
-            *   [Production Resource](https://real-url.com) - Deployment and scaling
-            *   [Best Practices](https://real-url.com) - Industry standards
-            *   [Advanced Tool](https://real-url.com) - Professional workflows
-        *   **🏁 Capstone Project:** [Comprehensive project that demonstrates mastery]
-
-        ### 🎯 Specialized Learning Paths
-        [If relevant to {request.goal}, add 2-3 specialization tracks with specific resources]
-        
-        ### 🛠️ Essential Tools & Frameworks
-        [Table of specific tools for {request.goal} with real URLs]
-        
-        ### 📊 Practice Platforms & Communities
-        *   **[Platform Name](real-url)** - What you can practice here
-        *   **[Community Name](real-url)** - Why join this community
-        *   **[Competition Platform](real-url)** - How to gain experience
-        [Add 5-8 specific platforms]
-
-        ### 🎓 Top Courses & Certifications
-        *   **[Specific Course Name](real-url)** - Institution/Platform
-        *   **[Certification Name](real-url)** - Why it matters
-        [Add 4-6 specific courses]
-
-        ### 🚀 Next Steps: Your Journey to {request.goal} Mastery
-        
-        1. **Week 1-2:** [Specific actionable steps]
-        2. **Week 3-4:** [Specific learning goals]
-        3. **Week 5-8:** [Specific milestones]
-        [Continue with 8-week breakdown]
-        
-        ### 📚 Recommended Books
-        *   **"[Actual Book Title]" by [Author]** - Why read this
-        [Add 3-5 real books]
-        
-        ### 🎯 Career Resources
-        *   **[Interview Prep Resource](real-url)** - Description
-        *   **[Job Board](real-url)** - Where to find {request.goal} jobs
-        [Add 3-5 career resources]
-
-        FINAL CHECK: Every resource MUST have a real, specific URL. No placeholders, no generic search links!
-        """
-        
-        response = model.generate_content(prompt)
-        return {"success": True, "path": response.text}
+        curriculum = generate_curriculum(
+            goal=request.goal,
+            experience_level=request.user_profile.experience_level,
+            skills=request.user_profile.skills,
+            use_previous=request.use_previous_skills
+        )
+        return {"success": True, "path": curriculum}
     except Exception as e:
         import traceback
         traceback.print_exc()
-        print(f"AI Generation Failed: {e}. Returning fallback content.")
-        print(f"Goal: {request.goal}, Level: {request.user_profile.experience_level}")
+        print(f"Curriculum generation failed: {e}")
+        # Minimal fallback
+        return {"success": True, "path": f"# 🚀 Learning Path: {request.goal}\n\n> Please try again. Visit [Coursera](https://www.coursera.org/search?query={request.goal.replace(' ', '+')}) or [freeCodeCamp](https://www.freecodecamp.org/) to get started.", "is_fallback": True}
         
-        # Dynamic fallback based on goal
-        goal_lower = request.goal.lower()
+
         
-        # Determine which fallback to use
-        if any(keyword in goal_lower for keyword in ['machine learning', 'ml', 'deep learning', 'ai', 'artificial intelligence']):
-            fallback_path = generate_ml_fallback(request.goal)
-        elif any(keyword in goal_lower for keyword in ['data analyst', 'data analysis', 'data science', 'analytics']):
-            fallback_path = generate_data_analyst_fallback(request.goal)
-        elif any(keyword in goal_lower for keyword in ['web dev', 'frontend', 'backend', 'full stack', 'react', 'javascript']):
-            fallback_path = generate_webdev_fallback(request.goal)
-        else:
-            # Generic comprehensive fallback
-            fallback_path = generate_generic_fallback(request.goal)
-        
-        return {"success": True, "path": fallback_path, "is_fallback": True}
-
-def generate_ml_fallback(goal):
-    return f"""
-# 🚀 Your Personalized Curriculum: {goal}
-
-> 💡 **AI Assistant Note:** Our AI is currently at capacity, but we've prepared a comprehensive, curated learning path just for you!
-
----
-
-## 📚 **Essential Machine Learning & AI Resources**
-
-| 🎓 **Platform / Course** | 🔗 **Link** | 💡 **Why This Matters** |
-| :--- | :--- | :--- |
-| **🏆 Andrew Ng's ML Course** | [Coursera ML Specialization](https://www.coursera.org/specializations/machine-learning-introduction) | The gold standard for ML beginners - comprehensive and well-structured |
-| **⚡ Fast.ai** | [Practical Deep Learning](https://course.fast.ai/) | Top-down approach - build real projects from day 1 |
-| **🎯 Google ML Crash Course** | [Google Developers](https://developers.google.com/machine-learning/crash-course) | Free, interactive, with TensorFlow tutorials |
-| **📊 Scikit-learn Docs** | [scikit-learn.org](https://scikit-learn.org/stable/tutorial/index.html) | Best resource for classical ML algorithms |
-| **🧠 Deep Learning Specialization** | [Coursera Deep Learning](https://www.coursera.org/specializations/deep-learning) | Advanced neural networks by Andrew Ng |
-| **🏅 Kaggle Learn** | [kaggle.com/learn](https://www.kaggle.com/learn) | Hands-on micro-courses with real datasets |
-| **⭐ Awesome Machine Learning** | [GitHub Awesome ML](https://github.com/josephmisiti/awesome-machine-learning) | Curated list of ML frameworks and libraries |
-| **📄 Papers With Code** | [paperswithcode.com](https://paperswithcode.com/) | Latest ML research with implementation code |
-
----
-
-## 🗂️ **Detailed Learning Modules**
-
-### 📘 **Phase 1: Foundations & Core Concepts** (Weeks 1-8)
-
-**🎯 Focus:** Mathematics, Python, and Classical ML Algorithms
-
-**📖 Key Resources:**
-- 🐍 **[Python for Data Science](https://www.kaggle.com/learn/python)** - Master Python basics with interactive exercises
-- 🔢 **[NumPy Tutorial](https://numpy.org/doc/stable/user/quickstart.html)** - Essential for numerical computing
-- 🐼 **[Pandas Documentation](https://pandas.pydata.org/docs/getting_started/intro_tutorials/index.html)** - Data manipulation fundamentals
-- 📐 **[Khan Academy Linear Algebra](https://www.khanacademy.org/math/linear-algebra)** - Math foundations made easy
-- 🎨 **[3Blue1Brown Neural Networks](https://www.youtube.com/playlist?list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi)** - Visual intuition for ML concepts
-- 📊 **[StatQuest ML Playlist](https://www.youtube.com/playlist?list=PLblh5JKOoLUICTaGLRoHQDuF_7q2GfuJF)** - Statistics made simple and fun
-
-**🏁 Milestone Project:** Build a house price predictor using linear regression
-        
----
-
-### 📗 **Phase 2: Core Expertise & Deep Learning** (Weeks 9-16)
-
-**🎯 Focus:** Neural Networks, TensorFlow/PyTorch, Computer Vision & NLP
-
-**📖 Key Resources:**
-- 🔥 **[TensorFlow Tutorials](https://www.tensorflow.org/tutorials)** - Official TensorFlow guides
-- ⚡ **[PyTorch Tutorials](https://pytorch.org/tutorials/)** - Official PyTorch learning path
-- 👁️ **[CS231n Stanford CNN Course](http://cs231n.stanford.edu/)** - Computer vision fundamentals
-- 💬 **[CS224n Stanford NLP Course](http://web.stanford.edu/class/cs224n/)** - Natural language processing
-- 🤗 **[Hugging Face Course](https://huggingface.co/learn/nlp-course/chapter1/1)** - Modern NLP with transformers
-- 📚 **[Deep Learning Book](https://www.deeplearningbook.org/)** - Comprehensive theory by Ian Goodfellow
-- ✨ **[Distill.pub](https://distill.pub/)** - Beautiful ML explanations
-
-**🏁 Milestone Project:** Build an image classifier or sentiment analysis model
-        
----
-
-### 📙 **Phase 3: Advanced Mastery & Specialization** (Weeks 17-24)
-
-**🎯 Focus:** MLOps, Production Deployment, Advanced Architectures
-
-**📖 Key Resources:**
-- 🚀 **[Full Stack Deep Learning](https://fullstackdeeplearning.com/)** - Production ML systems
-- ⚙️ **[MLOps Guide](https://ml-ops.org/)** - Best practices for ML operations
-- 🔧 **[TensorFlow Extended (TFX)](https://www.tensorflow.org/tfx/guide)** - End-to-end ML pipelines
-- 📊 **[MLflow Documentation](https://mlflow.org/docs/latest/index.html)** - Experiment tracking and deployment
-- 📈 **[Weights & Biases Tutorials](https://docs.wandb.ai/tutorials)** - ML experiment management
-- 🐳 **[Docker for ML](https://docs.docker.com/get-started/)** - Containerization basics
-- ☸️ **[Kubernetes ML Guide](https://kubernetes.io/docs/tutorials/)** - Scaling ML applications
-- ☁️ **[AWS SageMaker](https://aws.amazon.com/sagemaker/getting-started/)** - Cloud ML deployment
-
-**🏁 Capstone Project:** Deploy a full ML application with CI/CD pipeline
-
----
-
-## 🎯 **Specialized Learning Paths**
-
-### 👁️ **Computer Vision Track**
-- 📷 **[OpenCV Tutorials](https://docs.opencv.org/4.x/d9/df8/tutorial_root.html)** - Image processing fundamentals
-- 🎯 **[YOLO Object Detection](https://github.com/ultralytics/yolov5)** - State-of-the-art detection
-- 🔍 **[Detectron2](https://github.com/facebookresearch/detectron2)** - Facebook's CV library
-
-### 💬 **Natural Language Processing Track**
-- 📝 **[spaCy Course](https://course.spacy.io/)** - Industrial-strength NLP
-- 📖 **[NLTK Book](https://www.nltk.org/book/)** - Classic NLP with Python
-- 🤖 **[Transformers Documentation](https://huggingface.co/docs/transformers/index)** - Modern NLP models
-
-### 🎮 **Reinforcement Learning Track**
-- 🌀 **[OpenAI Spinning Up](https://spinningup.openai.com/)** - Deep RL fundamentals
-- 🧠 **[DeepMind RL Course](https://www.deepmind.com/learning-resources/reinforcement-learning-lecture-series-2021)** - Advanced RL concepts
-- 🎯 **[Stable Baselines3](https://stable-baselines3.readthedocs.io/)** - RL algorithms implementation
-
----
-
-## 🛠️ **Essential Tools & Frameworks**
-
-| 🔧 **Tool** | 🔗 **Link** | 💡 **Purpose** |
-| :--- | :--- | :--- |
-| **📓 Jupyter Notebook** | [jupyter.org](https://jupyter.org/) | Interactive coding environment |
-| **☁️ Google Colab** | [colab.research.google.com](https://colab.research.google.com/) | Free GPU for training |
-| **🐍 Anaconda** | [anaconda.com](https://www.anaconda.com/) | Python distribution for data science |
-| **💻 VS Code** | [code.visualstudio.com](https://code.visualstudio.com/) | Best IDE for ML development |
-| **📂 Git & GitHub** | [github.com](https://github.com/) | Version control for projects |
-
----
-
-## 📊 **Practice Platforms & Datasets**
-
-- 🏆 **[Kaggle Competitions](https://www.kaggle.com/competitions)** - Real-world ML challenges with prizes
-- 📚 **[UCI ML Repository](https://archive.ics.uci.edu/ml/index.php)** - Classic datasets for practice
-- 🔍 **[Google Dataset Search](https://datasetsearch.research.google.com/)** - Find datasets for any domain
-- 📦 **[TensorFlow Datasets](https://www.tensorflow.org/datasets)** - Ready-to-use datasets
-- 💻 **[HackerRank AI](https://www.hackerrank.com/domains/ai)** - Coding challenges for ML
-- 🧩 **[LeetCode ML Problems](https://leetcode.com/)** - Algorithm practice
-
----
-
-## 🎓 **University Courses (Free Online)**
-
-- 🏛️ **[MIT 6.S191 Deep Learning](http://introtodeeplearning.com/)** - Intensive 1-week bootcamp
-- 🎓 **[Stanford CS229 Machine Learning](https://cs229.stanford.edu/)** - Graduate-level ML course
-- 🐻 **[Berkeley CS188 AI](https://inst.eecs.berkeley.edu/~cs188/)** - Artificial Intelligence fundamentals
-- 🏫 **[CMU 10-701 ML](http://www.cs.cmu.edu/~tom/10701_sp11/)** - Theoretical foundations
-
----
-
-## 📱 **Communities & Networking**
-
-- 💬 **[r/MachineLearning](https://www.reddit.com/r/MachineLearning/)** - Latest research and discussions
-- 🤝 **[AI Alignment Forum](https://www.alignmentforum.org/)** - Advanced AI safety discussions
-- ⚙️ **[MLOps Community](https://mlops.community/)** - Production ML best practices
-- ✍️ **[Towards Data Science](https://towardsdatascience.com/)** - Medium publication for ML articles
-- 📚 **[Machine Learning Mastery](https://machinelearningmastery.com/)** - Practical tutorials
-
----
-
-## 🚀 **Next Steps: Your Journey to ML Mastery**
-
-1. **Week 1-2:** 🔧 Set up your environment (Python, Jupyter, Git) and complete Python basics
-2. **Week 3-4:** 📊 Master NumPy and Pandas through Kaggle micro-courses
-3. **Week 5-8:** 🎓 Complete Andrew Ng's ML course on Coursera
-4. **Week 9-12:** 🏗️ Build 3 projects: regression, classification, and clustering
-5. **Week 13-16:** 🧠 Learn deep learning with Fast.ai or TensorFlow tutorials
-6. **Week 17-20:** 🎯 Specialize in Computer Vision OR NLP
-7. **Week 21-24:** 🚀 Deploy a full ML application and contribute to open source
-8. **Ongoing:** 📈 Participate in Kaggle competitions and read ML papers weekly
-
----
-
-## 📚 **Recommended Books**
-
-- 📖 **"Hands-On Machine Learning" by Aurélien Géron** - Best practical ML book
-- 🧠 **"Deep Learning" by Ian Goodfellow** - Comprehensive theory
-- 📊 **"Pattern Recognition and Machine Learning" by Christopher Bishop** - Mathematical foundations
-- 📝 **"The Hundred-Page Machine Learning Book" by Andriy Burkov** - Quick overview
-
----
-
-## 🎯 **Career Resources**
-
-- 💼 **[ML Interview Prep](https://github.com/khangich/machine-learning-interview)** - Interview questions and answers
-- 📘 **[Chip Huyen's ML Interviews Book](https://huyenchip.com/ml-interviews-book/)** - Comprehensive interview guide
-- 🎓 **[LinkedIn Learning ML Paths](https://www.linkedin.com/learning/)** - Professional development courses
-
----
-
-**✨ Remember:** Machine Learning is a marathon, not a sprint. Focus on understanding fundamentals, build projects consistently, and engage with the community. Good luck on your ML journey! 🚀
-"""
-
-def generate_data_analyst_fallback(goal):
-    return f"""
-# 🚀 Your Personalized Curriculum: {goal}
-
-> 💡 **AI Assistant Note:** Our AI is currently at capacity, but we've prepared a comprehensive, curated learning path just for you!
-
----
-
-## 📚 **Essential Data Analysis Resources**
-
-| 🎓 **Platform / Course** | 🔗 **Link** | 💡 **Why This Matters** |
-| :--- | :--- | :--- |
-| **📊 Google Data Analytics Certificate** | [Coursera Google DA](https://www.coursera.org/professional-certificates/google-data-analytics) | Industry-recognized certification from Google |
-| **🎯 DataCamp Data Analyst Track** | [DataCamp](https://www.datacamp.com/tracks/data-analyst-with-python) | Interactive learning with real datasets |
-| **📈 Kaggle Learn** | [kaggle.com/learn](https://www.kaggle.com/learn) | Free micro-courses on data analysis |
-| **🐍 Python for Data Analysis** | [Python Data Science Handbook](https://jakevdp.github.io/PythonDataScienceHandbook/) | Free online book by Jake VanderPlas |
-| **📊 Excel Skills** | [Excel Exposure](https://excelexposure.com/) | Master Excel from basics to advanced |
-| **💾 SQL Tutorial** | [Mode Analytics SQL Tutorial](https://mode.com/sql-tutorial/) | Learn SQL with real business data |
-| **📉 Tableau Public** | [Tableau Learning](https://public.tableau.com/en-us/s/resources) | Free data visualization training |
-| **⭐ Awesome Data Science** | [GitHub Awesome DS](https://github.com/academic/awesome-datascience) | Curated list of data science resources |
-
----
-
-## 🗂️ **Detailed Learning Modules**
-
-### 📘 **Phase 1: Foundations & Tools** (Weeks 1-8)
-
-**🎯 Focus:** Excel, SQL, Python Basics, Statistics
-
-**📖 Key Resources:**
-- 📊 **[Excel Skills for Business](https://www.coursera.org/specializations/excel)** - Master Excel for data analysis
-- 💾 **[SQL for Data Analysis](https://www.udacity.com/course/sql-for-data-analysis--ud198)** - Free Udacity course
-- 🐍 **[Python for Data Science](https://www.kaggle.com/learn/python)** - Interactive Python tutorials
-- 📈 **[Statistics Fundamentals](https://www.khanacademy.org/math/statistics-probability)** - Khan Academy stats
-- 📊 **[Pandas Tutorial](https://pandas.pydata.org/docs/getting_started/intro_tutorials/index.html)** - Data manipulation with Pandas
-- 📉 **[Data Cleaning Guide](https://realpython.com/python-data-cleaning-numpy-pandas/)** - Clean messy data
-
-**🏁 Milestone Project:** Analyze a real dataset and create an Excel dashboard
-
----
-
-### 📗 **Phase 2: Advanced Analysis & Visualization** (Weeks 9-16)
-
-**🎯 Focus:** Advanced SQL, Data Visualization, Business Intelligence
-
-**📖 Key Resources:**
-- 🎨 **[Tableau Training](https://www.tableau.com/learn/training)** - Official Tableau courses
-- 📊 **[Power BI Learning](https://docs.microsoft.com/en-us/power-bi/guided-learning/)** - Microsoft Power BI tutorials
-- 💾 **[Advanced SQL](https://www.windowfunctions.com/)** - Master window functions
-- 📈 **[Matplotlib & Seaborn](https://seaborn.pydata.org/tutorial.html)** - Python visualization libraries
-- 📊 **[Storytelling with Data](https://www.storytellingwithdata.com/)** - Data visualization best practices
-- 🔍 **[Exploratory Data Analysis](https://www.kaggle.com/learn/data-visualization)** - Kaggle EDA course
-
-**🏁 Milestone Project:** Build an interactive Tableau/Power BI dashboard
-
----
-
-### 📙 **Phase 3: Business Analytics & Advanced Topics** (Weeks 17-24)
-
-**🎯 Focus:** Predictive Analytics, A/B Testing, Business Metrics
-
-**📖 Key Resources:**
-- 📊 **[Google Analytics Academy](https://analytics.google.com/analytics/academy/)** - Free GA certification
-- 🧪 **[A/B Testing Course](https://www.udacity.com/course/ab-testing--ud257)** - Udacity free course
-- 📈 **[Predictive Analytics](https://www.coursera.org/learn/predictive-analytics)** - Forecasting techniques
-- 💼 **[Business Metrics](https://www.klipfolio.com/resources/kpi-examples)** - KPI examples and guides
-- 🔍 **[Data Mining](https://www.youtube.com/playlist?list=PLLssT5z_DsK9JDLcT8T62VtzwyW9LNepV)** - Stanford data mining course
-- 📊 **[R for Data Science](https://r4ds.had.co.nz/)** - Free online R book
-
-**🏁 Capstone Project:** Complete end-to-end business analysis with recommendations
-
----
-
-## 🛠️ **Essential Tools & Software**
-
-| 🔧 **Tool** | 🔗 **Link** | 💡 **Purpose** |
-| :--- | :--- | :--- |
-| **📊 Microsoft Excel** | [Excel Online](https://www.microsoft.com/en-us/microsoft-365/excel) | Spreadsheet analysis and dashboards |
-| **📈 Tableau Public** | [Tableau Public](https://public.tableau.com/) | Free data visualization tool |
-| **📊 Power BI Desktop** | [Power BI](https://powerbi.microsoft.com/) | Microsoft's BI platform |
-| **🐍 Python + Jupyter** | [Anaconda](https://www.anaconda.com/) | Python data science distribution |
-| **💾 PostgreSQL** | [PostgreSQL](https://www.postgresql.org/) | Open-source database for SQL practice |
-| **📂 Git & GitHub** | [GitHub](https://github.com/) | Version control for projects |
-
----
-
-## 📊 **Practice Platforms & Datasets**
-
-- 🏆 **[Kaggle Datasets](https://www.kaggle.com/datasets)** - Thousands of real datasets
-- 📚 **[UCI ML Repository](https://archive.ics.uci.edu/ml/index.php)** - Classic datasets
-- 🔍 **[Google Dataset Search](https://datasetsearch.research.google.com/)** - Find any dataset
-- 📊 **[Data.gov](https://www.data.gov/)** - US government open data
-- 🌍 **[World Bank Data](https://data.worldbank.org/)** - Global development data
-- 💼 **[HackerRank SQL](https://www.hackerrank.com/domains/sql)** - SQL practice problems
-
----
-
-## 🎓 **Free Certifications & Courses**
-
-- 🏆 **[Google Data Analytics Certificate](https://www.coursera.org/professional-certificates/google-data-analytics)** - Industry-recognized
-- 📊 **[IBM Data Analyst Certificate](https://www.coursera.org/professional-certificates/ibm-data-analyst)** - Comprehensive program
-- 💾 **[Microsoft Power BI Certification](https://docs.microsoft.com/en-us/learn/certifications/data-analyst-associate/)** - Official Microsoft cert
-- 📈 **[Tableau Desktop Specialist](https://www.tableau.com/learn/certification/desktop-specialist)** - Tableau certification
-
----
-
-## 📱 **Communities & Networking**
-
-- 💬 **[r/DataAnalysis](https://www.reddit.com/r/DataAnalysis/)** - Data analysis community
-- 📊 **[Tableau Community](https://community.tableau.com/)** - Tableau forums and tips
-- 💼 **[Data Science Central](https://www.datasciencecentral.com/)** - Articles and discussions
-- 🤝 **[Analytics Vidhya](https://www.analyticsvidhya.com/)** - Learning community
-
----
-
-## 🚀 **Next Steps: Your Journey to Data Analyst Mastery**
-
-1. **Week 1-2:** 📊 Master Excel basics and create your first pivot table
-2. **Week 3-4:** 💾 Learn SQL fundamentals and query real databases
-3. **Week 5-8:** 🐍 Start Python with Pandas for data manipulation
-4. **Week 9-12:** 📈 Build your first Tableau/Power BI dashboard
-5. **Week 13-16:** 📊 Complete Google Data Analytics Certificate
-6. **Week 17-20:** 🧪 Learn A/B testing and statistical analysis
-7. **Week 21-24:** 💼 Build a portfolio with 3-5 complete projects
-8. **Ongoing:** 📈 Participate in Kaggle competitions and network
-
----
-
-## 📚 **Recommended Books**
-
-- 📖 **"Storytelling with Data" by Cole Nussbaumer Knaflic** - Visualization masterclass
-- 📊 **"Python for Data Analysis" by Wes McKinney** - Pandas creator's guide
-- 📈 **"The Data Warehouse Toolkit" by Ralph Kimball** - Data modeling bible
-- 💼 **"Lean Analytics" by Alistair Croll** - Business metrics guide
-
----
-
-## 🎯 **Career Resources**
-
-- 💼 **[Data Analyst Interview Prep](https://www.interviewquery.com/)** - Practice interview questions
-- 📊 **[Glassdoor Salary Data](https://www.glassdoor.com/Salaries/data-analyst-salary-SRCH_KO0,12.htm)** - Salary expectations
-- 🎓 **[LinkedIn Learning](https://www.linkedin.com/learning/)** - Professional development
-
----
-
-**✨ Remember:** Data Analysis is about telling stories with data. Focus on business impact, communicate clearly, and always validate your insights. Good luck on your journey! 🚀
-"""
-
-def generate_webdev_fallback(goal):
-    return f"""
-# 🚀 Your Personalized Curriculum: {goal}
-
-> 💡 **AI Assistant Note:** Our AI is currently at capacity, but we've prepared a comprehensive, curated learning path just for you!
-
----
-
-## 📚 **Essential Web Development Resources**
-
-| 🎓 **Platform / Course** | 🔗 **Link** | 💡 **Why This Matters** |
-| :--- | :--- | :--- |
-| **🌐 MDN Web Docs** | [developer.mozilla.org](https://developer.mozilla.org/) | The ultimate web development reference |
-| **🎯 FreeCodeCamp** | [freecodecamp.org](https://www.freecodecamp.org/) | Free, comprehensive web dev curriculum |
-| **🛤️ The Odin Project** | [theodinproject.com](https://www.theodinproject.com/) | Full-stack development path |
-| **⚛️ React Official Docs** | [react.dev](https://react.dev/) | Learn React from the source |
-| **💚 Node.js Guides** | [nodejs.org/en/docs](https://nodejs.org/en/docs/guides/) | Official Node.js documentation |
-| **🎨 CSS-Tricks** | [css-tricks.com](https://css-tricks.com/) | CSS tutorials and tips |
-| **⭐ Awesome Web Dev** | [GitHub Awesome](https://github.com/sindresorhus/awesome) | Curated web dev resources |
-| **🏗️ web.dev** | [web.dev](https://web.dev/) | Google's web development guidance |
-
----
-
-## 🗂️ **Detailed Learning Modules**
-
-### 📘 **Phase 1: Frontend Foundations** (Weeks 1-8)
-
-**🎯 Focus:** HTML, CSS, JavaScript Fundamentals
-
-**📖 Key Resources:**
-- 🌐 **[HTML & CSS Tutorial](https://www.freecodecamp.org/learn/responsive-web-design/)** - FreeCodeCamp certification
-- 🎨 **[CSS Grid & Flexbox](https://cssgrid.io/)** - Wes Bos free course
-- ⚡ **[JavaScript30](https://javascript30.com/)** - 30 vanilla JS projects
-- 📱 **[Responsive Web Design](https://web.dev/responsive-web-design-basics/)** - Google's guide
-- 🎯 **[JavaScript.info](https://javascript.info/)** - Modern JavaScript tutorial
-- 🔧 **[Git & GitHub](https://www.freecodecamp.org/news/git-and-github-for-beginners/)** - Version control basics
-
-**🏁 Milestone Project:** Build a responsive portfolio website
-
----
-
-### 📗 **Phase 2: Modern Frontend & Frameworks** (Weeks 9-16)
-
-**🎯 Focus:** React, Vue, or Angular + Modern Tools
-
-**📖 Key Resources:**
-- ⚛️ **[React Tutorial](https://react.dev/learn)** - Official React docs
-- 🎓 **[Full Stack Open](https://fullstackopen.com/)** - React + Node.js course
-- 🎨 **[Tailwind CSS](https://tailwindcss.com/docs)** - Utility-first CSS framework
-- 📦 **[npm & Package Management](https://docs.npmjs.com/)** - JavaScript packages
-- ⚡ **[Vite Documentation](https://vitejs.dev/)** - Modern build tool
-- 🔧 **[TypeScript Handbook](https://www.typescriptlang.org/docs/)** - Typed JavaScript
-
-**🏁 Milestone Project:** Build a full-featured React application
-
----
-
-### 📙 **Phase 3: Backend & Full Stack** (Weeks 17-24)
-
-**🎯 Focus:** Node.js, Databases, APIs, Deployment
-
-**📖 Key Resources:**
-- 💚 **[Node.js Tutorial](https://nodejs.dev/learn)** - Official Node.js guide
-- 🚀 **[Express.js Guide](https://expressjs.com/en/guide/routing.html)** - Web framework for Node
-- 💾 **[MongoDB University](https://university.mongodb.com/)** - Free MongoDB courses
-- 🐘 **[PostgreSQL Tutorial](https://www.postgresqltutorial.com/)** - SQL database guide
-- 🔐 **[Authentication Guide](https://www.passportjs.org/)** - User authentication
-- ☁️ **[Deploy on Vercel](https://vercel.com/docs)** - Free hosting and deployment
-
-**🏁 Capstone Project:** Build and deploy a full-stack application
-
----
-
-## 🛠️ **Essential Tools & Technologies**
-
-| 🔧 **Tool** | 🔗 **Link** | 💡 **Purpose** |
-| :--- | :--- | :--- |
-| **💻 VS Code** | [code.visualstudio.com](https://code.visualstudio.com/) | Best code editor for web dev |
-| **🌐 Chrome DevTools** | [Chrome DevTools](https://developer.chrome.com/docs/devtools/) | Browser debugging tools |
-| **📦 npm** | [npmjs.com](https://www.npmjs.com/) | JavaScript package manager |
-| **📂 Git & GitHub** | [github.com](https://github.com/) | Version control and collaboration |
-| **🎨 Figma** | [figma.com](https://www.figma.com/) | UI/UX design tool |
-| **📱 Postman** | [postman.com](https://www.postman.com/) | API testing tool |
-
----
-
-## 📊 **Practice Platforms & Challenges**
-
-- 💻 **[Frontend Mentor](https://www.frontendmentor.io/)** - Real-world frontend challenges
-- 🏆 **[CodePen](https://codepen.io/)** - Frontend playground and inspiration
-- 🧩 **[LeetCode](https://leetcode.com/)** - Algorithm practice
-- 🎯 **[HackerRank](https://www.hackerrank.com/domains/tutorials/10-days-of-javascript)** - JavaScript challenges
-- 🌐 **[DevChallenges](https://devchallenges.io/)** - Real-world projects
-
----
-
-## 🎓 **Free Courses & Certifications**
-
-- 🏆 **[FreeCodeCamp Certifications](https://www.freecodecamp.org/learn)** - 6 free certifications
-- 🎓 **[The Odin Project](https://www.theodinproject.com/)** - Full curriculum
-- 💚 **[Node.js Certification](https://nodejs.org/en/about/get-involved/certification)** - Official Node.js cert
-- ⚛️ **[Meta React Certificate](https://www.coursera.org/professional-certificates/meta-react-native)** - Meta's React course
-
----
-
-## 📱 **Communities & Networking**
-
-- 💬 **[r/webdev](https://www.reddit.com/r/webdev/)** - Web development community
-- 🐦 **[Dev.to](https://dev.to/)** - Developer community and articles
-- 💼 **[Stack Overflow](https://stackoverflow.com/)** - Q&A for developers
-- 🤝 **[Discord: The Programmer's Hangout](https://discord.gg/programming)** - Active dev community
-
----
-
-## 🚀 **Next Steps: Your Journey to Web Dev Mastery**
-
-1. **Week 1-2:** 🌐 Master HTML & CSS basics, build 3 simple pages
-2. **Week 3-4:** 🎨 Learn CSS Grid, Flexbox, and responsive design
-3. **Week 5-8:** ⚡ Complete JavaScript30 and build interactive projects
-4. **Week 9-12:** ⚛️ Learn React and build 3 React applications
-5. **Week 13-16:** 🎯 Master state management and API integration
-6. **Week 17-20:** 💚 Learn Node.js, Express, and build a REST API
-7. **Week 21-24:** 🚀 Build and deploy a full-stack application
-8. **Ongoing:** 💼 Contribute to open source and build portfolio
-
----
-
-## 📚 **Recommended Books**
-
-- 📖 **"Eloquent JavaScript" by Marijn Haverbeke** - Free online JavaScript book
-- 🎨 **"CSS Secrets" by Lea Verou** - Advanced CSS techniques
-- ⚛️ **"React Up & Running" by Stoyan Stefanov** - React fundamentals
-- 💚 **"Node.js Design Patterns" by Mario Casciaro** - Advanced Node.js
-
----
-
-## 🎯 **Career Resources**
-
-- 💼 **[Frontend Interview Handbook](https://www.frontendinterviewhandbook.com/)** - Interview prep
-- 📊 **[Glassdoor Web Dev Salaries](https://www.glassdoor.com/Salaries/web-developer-salary-SRCH_KO0,13.htm)** - Salary data
-- 🎓 **[LinkedIn Learning](https://www.linkedin.com/learning/)** - Professional courses
-
----
-
-**✨ Remember:** Web development is constantly evolving. Focus on fundamentals, build projects, and never stop learning. Good luck on your journey! 🚀
-"""
-
-def generate_generic_fallback(goal):
-    return f"""
-# 🚀 Your Personalized Curriculum: {goal}
-
-> 💡 **AI Assistant Note:** Our AI is currently at capacity, but we've prepared a comprehensive learning path to get you started!
-
----
-
-## 📚 **Essential Learning Resources**
-
-| 🎓 **Platform / Course** | 🔗 **Link** | 💡 **Why This Matters** |
-| :--- | :--- | :--- |
-| **🌐 Coursera** | [coursera.org](https://www.coursera.org/) | University-level courses from top institutions |
-| **🎯 edX** | [edx.org](https://www.edx.org/) | Free courses from MIT, Harvard, and more |
-| **📚 Udemy** | [udemy.com](https://www.udemy.com/) | Practical, project-based courses |
-| **🎓 Khan Academy** | [khanacademy.org](https://www.khanacademy.org/) | Free education for all subjects |
-| **💻 YouTube EDU** | [YouTube Learning](https://www.youtube.com/channel/UCSSlekSYRoyQo8uQGHvq4qQ) | Free video tutorials |
-| **📖 MIT OpenCourseWare** | [ocw.mit.edu](https://ocw.mit.edu/) | Free MIT course materials |
-| **⭐ GitHub Learning Lab** | [lab.github.com](https://lab.github.com/) | Learn by doing with GitHub |
-| **🏆 LinkedIn Learning** | [linkedin.com/learning](https://www.linkedin.com/learning/) | Professional development courses |
-
----
-
-## 🗂️ **Learning Path Structure**
-
-### 📘 **Phase 1: Foundations** (Weeks 1-8)
-
-**🎯 Focus:** Build strong fundamentals in {goal}
-
-**📖 Recommended Actions:**
-- 🔍 Research the core skills needed for {goal}
-- 📚 Take introductory courses on Coursera or edX
-- 💻 Set up your learning environment and tools
-- 📝 Start a learning journal to track progress
-- 🤝 Join online communities related to {goal}
-- 🏗️ Build your first small project
-
-**🏁 Milestone:** Complete foundational knowledge and create a simple project
-
----
-
-### 📗 **Phase 2: Skill Development** (Weeks 9-16)
-
-**🎯 Focus:** Develop practical skills and build projects
-
-**📖 Recommended Actions:**
-- 🎯 Take intermediate-level courses
-- 🏗️ Build 3-5 progressively complex projects
-- 📊 Learn industry-standard tools and frameworks
-- 💼 Start building a portfolio
-- 🤝 Network with professionals in the field
-- 📚 Read industry blogs and documentation
-
-**🏁 Milestone:** Complete a portfolio-worthy project
-
----
-
-### 📙 **Phase 3: Mastery & Specialization** (Weeks 17-24)
-
-**🎯 Focus:** Advanced topics and real-world application
-
-**📖 Recommended Actions:**
-- 🚀 Take advanced courses or specializations
-- 💼 Work on real-world projects or freelance
-- 🎓 Consider professional certifications
-- 🤝 Contribute to open-source projects
-- 📈 Build a strong online presence (GitHub, LinkedIn)
-- 💡 Mentor others or teach what you've learned
-
-**🏁 Capstone:** Complete a comprehensive project demonstrating mastery
-
----
-
-## 🛠️ **Essential Learning Tools**
-
-| 🔧 **Tool** | 🔗 **Link** | 💡 **Purpose** |
-| :--- | :--- | :--- |
-| **💻 VS Code** | [code.visualstudio.com](https://code.visualstudio.com/) | Universal code editor |
-| **📂 GitHub** | [github.com](https://github.com/) | Version control and portfolio |
-| **📝 Notion** | [notion.so](https://www.notion.so/) | Note-taking and organization |
-| **🎨 Canva** | [canva.com](https://www.canva.com/) | Design and presentations |
-| **💬 Discord** | [discord.com](https://discord.com/) | Join learning communities |
-
----
-
-## 📊 **Practice & Community Platforms**
-
-- 🏆 **[Reddit Communities](https://www.reddit.com/)** - Find subreddits for {goal}
-- 💬 **[Stack Overflow](https://stackoverflow.com/)** - Q&A for technical questions
-- 🤝 **[Discord Servers](https://discord.com/)** - Join learning communities
-- 📚 **[Medium](https://medium.com/)** - Read articles and tutorials
-- 🎓 **[Meetup](https://www.meetup.com/)** - Find local learning groups
-
----
-
-## 🎓 **Recommended Learning Platforms**
-
-- 🏆 **[Coursera](https://www.coursera.org/)** - University courses with certificates
-- 🎯 **[edX](https://www.edx.org/)** - Free courses from top universities
-- 📚 **[Udacity](https://www.udacity.com/)** - Nanodegree programs
-- 💻 **[Pluralsight](https://www.pluralsight.com/)** - Technology skills platform
-- 🎓 **[Skillshare](https://www.skillshare.com/)** - Creative and business skills
-
----
-
-## 🚀 **Next Steps: Your Learning Journey**
-
-1. **Week 1-2:** 🔍 Research {goal} and define your learning objectives
-2. **Week 3-4:** 📚 Enroll in foundational courses
-3. **Week 5-8:** 🏗️ Build your first project
-4. **Week 9-12:** 🎯 Develop intermediate skills
-5. **Week 13-16:** 💼 Create portfolio projects
-6. **Week 17-20:** 🚀 Learn advanced topics
-7. **Week 21-24:** 🏆 Complete capstone project
-8. **Ongoing:** 📈 Continue learning and networking
-
----
-
-## 📚 **General Learning Resources**
-
-- 📖 **Search for books on {goal}** on Amazon or Goodreads
-- 🎥 **YouTube channels** focused on {goal}
-- 📝 **Medium articles** and blog posts
-- 🎓 **Professional certifications** in {goal}
-
----
-
-## 🎯 **Career Development**
-
-- 💼 **[LinkedIn](https://www.linkedin.com/)** - Build your professional network
-- 📊 **[Glassdoor](https://www.glassdoor.com/)** - Research salaries and companies
-- 🎓 **[Indeed Career Guide](https://www.indeed.com/career-advice)** - Career resources
-- 💡 **[AngelList](https://angel.co/)** - Startup jobs and opportunities
-
----
-
-**✨ Remember:** Every expert was once a beginner. Stay consistent, build projects, and engage with the community. Good luck on your journey to becoming a {goal}! 🚀
-"""
-                
-
 class TaskRequest(BaseModel):
     goal: str
     skills: List[str] = []
     experience_level: str
     focus_area: str
     language: str = "python"
+    random_seed: Optional[str] = None
 
 @app.post("/generate-tasks")
 async def generate_tasks(request: TaskRequest):
     try:
         prompt = f"""
         Act as a Senior Software Architect and Coding Interviewer. 
-        Create 3 CHALLENGING and REAL-WORLD coding tasks for a user learning: {request.goal}.
+        Create 3 UNIQUE, RANDOM, CHALLENGING, and REAL-WORLD coding tasks tailored specifically for a user taking the course/topic: "{request.goal}".
         
         CONTEXT:
-        - Focus Area: {request.focus_area}
+        - Specific Course/Topic: {request.focus_area}
         - User Level: {request.experience_level}
         - Programming Language: {request.language}
         - Current Skills: {', '.join(request.skills)}
+        - Randomization Seed: {request.random_seed} (Ensure entirely new tasks compared to previous requests)
 
         CRITERIA FOR TASKS:
-        1. "Real-world": Avoid generic academic problems. Tasks should be scenarios like "Process User Logs", "Validate API Payload", "Calculate Financial Ratios", or "Optimize Data Queries".
-        2. Professional Starter Code: Include proper comments, type hints (if applicable for {request.language}), and a clear function signature.
-        3. Testability: Ensure the tasks can be verified with input/output matching.
+        1. "Relevance": Tasks MUST be directly related and highly specific to the course: "{request.goal}". Do NOT provide generic programming tasks unless the user's goal is general programming.
+        2. "Diversity & Randomness": Ensure tasks cover different sub-topics of the course. Use the random seed to vary the problems widely each time they are generated to ensure no duplicates.
+        3. "Real-world": Avoid generic academic problems. Scenarios should reflect professional use-cases specific to "{request.goal}".
+        4. "Accuracy": Ensure the model generates 100% accurate, optimized code. The test cases must precisely match the provided solution's logic.
+        5. Professional Starter Code: Include proper comments, type hints (if applicable for {request.language}), and a clear function signature.
         
         Output a valid JSON array where each object has:
         - "title": A professional, descriptive title.
@@ -836,7 +122,7 @@ async def generate_tasks(request: TaskRequest):
         - "starter_code": Professional boilerplate code.
         - "solution": The complete, optimized solution.
         - "language": "{request.language}"
-        - "test_cases": An array of objects: [{"input": "function_call_or_input_code", "expected_output": "stringified_result"}]
+        - "test_cases": An array of objects: [{{"input": "function_call_or_input_code", "expected_output": "stringified_result"}}]
         
         Example JSON format:
         [
@@ -851,19 +137,41 @@ async def generate_tasks(request: TaskRequest):
                     {{"input": "validate_email('invalid-email')", "expected_output": "False"}}
                 ]
             }}
-        ]
         """
-        response = model.generate_content(prompt)
-        text = response.text
+        import requests
+        OPENROUTER_API_KEY = "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"
+        res = requests.post(
+            url="https://openrouter.ai/api/v1/chat/completions",
+            headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"},
+            json={"model": "google/gemini-2.5-flash", "messages": [{"role": "user", "content": prompt}], "temperature": 0.5, "max_tokens": 4096}
+        )
+        if res.status_code != 200:
+            print(f"OpenRouter Error Code: {res.status_code}, TEXT: {res.text[:500]}")
+            raise Exception(f"OpenRouter Error: {res.text}")
+            
+        text = res.json()["choices"][0]["message"]["content"]
         # Clean markdown
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0].strip()
         elif "```" in text:
             text = text.split("```")[1].split("```")[0].strip()
             
-        tasks = json.loads(text)
+        # Optional basic cleanup for trailing commas if it was truncated slightly
+        try:
+            tasks = json.loads(text)
+        except json.JSONDecodeError as je:
+            print(f"JSON Parse mapping failed, attempting to fix. \nError details: {je}")
+            # Ensure it ends with }]}] if truncated
+            if not text.endswith("]"):
+                idx = text.rfind("}")
+                if idx != -1:
+                    text = text[:idx+1] + "]"
+            tasks = json.loads(text)
+            
         return {"success": True, "tasks": tasks}
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"Task generation error: {e}")
         # Return 3 distinct fallback tasks related to the goal
         return {

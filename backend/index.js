@@ -5,19 +5,23 @@ const axios = require('axios');
 const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
+const WebSocket = require('ws');
+const pty = require('node-pty');
+const os = require('os');
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
-const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8001';
+const PORT = process.env.PORT || 5001;
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8002';
 const DATA_FILE = path.join(__dirname, 'data', 'users.json');
 
 app.use(cors());
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '10mb' }));
 
-// Serve static files from the 'public' folder
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve static files from the React app
+app.use(express.static(path.join(__dirname, '../client/dist')));
 
 // Helper functions for persistence
 const loadUsers = () => {
@@ -99,6 +103,52 @@ app.post('/api/login', (req, res) => {
     } else {
         res.status(401).json({ message: "Invalid credentials" });
     }
+});
+
+app.post('/api/google-login', (req, res) => {
+    const { email, name, picture } = req.body;
+    const users = loadUsers();
+
+    // Find user by email
+    let user = Object.values(users).find(u => u.email === email);
+
+    if (user) {
+        // User exists, log them in
+        if (!user.login_logs) user.login_logs = [];
+        user.login_logs.push({
+            timestamp: new Date().toISOString(),
+            userAgent: req.headers['user-agent']
+        });
+        saveUsers(users);
+        return res.json({ success: true, user });
+    }
+
+    // Register new user using email as username
+    const username = email.split('@')[0] + Math.floor(Math.random() * 1000);
+
+    users[username] = {
+        username,
+        email,
+        password: '', // No password for Google auth
+        profile: {
+            skills: [],
+            experience_level: 'Beginner',
+            bio: '',
+            learning_goals: [],
+            interests: [],
+            time_commitment: '1-5 hours',
+            learning_style: 'Visual',
+            difficulty_preference: 'Beginner-friendly',
+            onboarding_completed: false,
+            avatar: picture
+        },
+        learning_paths: [],
+        tasks: [],
+        progress: { streak: 0, completed_tasks: 0, last_active: null }
+    };
+
+    saveUsers(users);
+    res.json({ success: true, user: users[username] });
 });
 
 app.post('/api/user/profile', (req, res) => {
@@ -220,11 +270,22 @@ app.post('/api/user/complete-task', (req, res) => {
 
 app.post('/api/run-code', async (req, res) => {
     try {
-        const response = await axios.post(`${AI_SERVICE_URL}/run-code`, req.body);
+        const response = await axios.post(`${AI_SERVICE_URL}/run-code`, req.body, {
+            timeout: 15000 // 15 second timeout
+        });
         res.json(response.data);
     } catch (error) {
         console.error("Exec Error:", error.response?.data || error.message);
-        res.status(500).json({ success: false, error: "Execution server failed" });
+        // If the AI service returned an error response, forward it
+        if (error.response?.data) {
+            res.status(error.response.status || 500).json(error.response.data);
+        } else if (error.code === 'ECONNREFUSED') {
+            res.status(503).json({ success: false, error: "AI execution service is not running. Start it with: python main.py (in the ai/ folder)" });
+        } else if (error.code === 'ECONNABORTED') {
+            res.status(504).json({ success: false, error: "Execution timed out after 15 seconds" });
+        } else {
+            res.status(500).json({ success: false, error: `Execution server error: ${error.message}` });
+        }
     }
 });
 
@@ -241,28 +302,36 @@ app.post('/api/evaluate-code', async (req, res) => {
 // --- AI Proxy Routes ---
 app.post('/api/generate-path', async (req, res) => {
     try {
-        const response = await axios.post(`${AI_SERVICE_URL}/generate-path`, req.body);
+        const response = await axios.post(`${AI_SERVICE_URL}/generate-path`, req.body, { timeout: 60000 });
         res.json(response.data);
     } catch (error) {
         console.error("AI Service Error:", error.response?.data || error.message);
-        res.status(500).json({
-            message: "AI Service connection failed",
-            error: error.response?.data || error.message,
-            details: error.toString()
-        });
+        if (error.code === 'ECONNREFUSED') {
+            res.status(503).json({ message: "AI service not running. Start with: python main.py" });
+        } else {
+            res.status(500).json({
+                message: "AI Service connection failed",
+                error: error.response?.data?.detail || error.response?.data || error.message
+            });
+        }
     }
 });
 
 app.post('/api/generate-tasks', async (req, res) => {
     try {
-        const response = await axios.post(`${AI_SERVICE_URL}/generate-tasks`, req.body);
+        const response = await axios.post(`${AI_SERVICE_URL}/generate-tasks`, req.body, { timeout: 30000 });
         res.json(response.data);
     } catch (error) {
         console.error("AI Service Task Error:", error.response?.data || error.message);
-        res.status(500).json({
-            message: "AI Service connection failed",
-            error: error.response?.data || error.message
-        });
+        if (error.code === 'ECONNREFUSED') {
+            res.status(503).json({ success: false, message: "AI service not running. Start with: python main.py" });
+        } else {
+            res.status(500).json({
+                success: false,
+                message: "Task generation failed",
+                error: error.response?.data?.detail || error.message
+            });
+        }
     }
 });
 
@@ -279,12 +348,35 @@ app.post('/api/generate-resume', async (req, res) => {
     }
 });
 
-const http = require('http');
-const { WebSocketServer } = require('ws');
-const pty = require('node-pty');
+app.post('/api/voice-command', async (req, res) => {
+    try {
+        const response = await axios.post(`${AI_SERVICE_URL}/voice-command`, req.body);
+        res.json(response.data);
+    } catch (error) {
+        console.error("Voice AI Error:", error.response?.data || error.message);
+        // Fallback to chat type on error
+        res.json({ type: "chat", response: "I am having trouble connecting to my deeper cognitive functions." });
+    }
+});
+
+
+
+// --- Avatar Upload Endpoint ---
+app.post('/api/user/avatar', (req, res) => {
+    const { username, avatar } = req.body;
+    const users = loadUsers();
+    if (!users[username]) return res.status(404).json({ message: "User not found" });
+
+    if (!users[username].profile) users[username].profile = {};
+
+    users[username].profile.avatar = avatar;
+    saveUsers(users);
+
+    res.json({ success: true, user: users[username] });
+});
 
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: '/terminal' });
+const wss = new WebSocket.Server({ server, path: '/terminal' });
 
 wss.on('connection', (ws) => {
     console.log('Terminal connected');

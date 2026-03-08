@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AlgoAI Instructor – AI Algorithm Mentor</title>
+    <meta name="description"
+        content="AI-powered algorithm learning platform with voice control, code generation, and an interactive AI avatar mentor.">
+    <link rel="stylesheet" href="style.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;600&display=swap"
+        rel="stylesheet">
+    <!-- Highlight.js for syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+</head>
+
+<body>
+    <div id="app">
+
+        <!-- ===== HEADER ===== -->
+        <header>
+            <div class="logo">
+                <span class="pulse"></span>
+                <h1>AlgoAI <span>Instructor</span></h1>
+            </div>
+            <div class="header-center" id="voice-status-bar">
+                <div class="wave-bar hidden" id="wave-bar">
+                    <div class="wb"></div>
+                    <div class="wb"></div>
+                    <div class="wb"></div>
+                    <div class="wb"></div>
+                    <div class="wb"></div>
+                    <span id="voice-label">Listening…</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="progress-container">
+                    <div class="progress-bar" id="course-progress-bar" style="width: 0%"></div>
+                    <span id="progress-text">0% Complete</span>
+                </div>
+                <span class="status-badge">
+                    <span class="status-dot online" id="status-dot"></span>
+                    <span id="status-text">AI Mentor Active</span>
+                </span>
+            </div>
+        </header>
+
+        <!-- ===== MAIN 3-COLUMN LAYOUT ===== -->
+        <main>
+
+            <!-- LEFT PANEL: Course Navigation -->
+            <div class="panel panel-left">
+                <div class="panel-header">
+                    <span class="panel-icon">📚</span>
+                    <h3>Course Modules</h3>
+                </div>
+                <div class="panel-body" id="course-navigation">
+                    <div id="module-list" class="module-list">
+                        <!-- Modules injected via JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- CENTER: Avatar -->
+            <div class="avatar-area">
+                <div id="avatar-frame" class="avatar-frame">
+                    <img src="instructor.png" alt="AI Instructor" id="instructor-img">
+                    <div class="avatar-glow"></div>
+                    <div class="avatar-overlay hidden" id="thinking-overlay">
+                        <div class="think-dot"></div>
+                        <div class="think-dot"></div>
+                        <div class="think-dot"></div>
+                    </div>
+                </div>
+                <div class="avatar-label" id="avatar-label">Ready to help</div>
+
+                <div class="quote-box hidden" id="quote-box">
+                    <span class="quote-icon">✨</span>
+                    <p id="quote-text"></p>
+                </div>
+            </div>
+
+            <!-- RIGHT PANEL: Code Terminal + Output -->
+            <div class="panel panel-right">
+                <div class="panel-header">
+                    <span class="panel-icon">⚡</span>
+                    <h3>Live Terminal</h3>
+                    <div class="terminal-actions">
+                        <button id="copy-btn" class="icon-btn" title="Copy Code">📋 Copy</button>
+                        <button id="run-btn" class="run-btn" title="Run Code (or say 'Run')">▶ Run</button>
+                    </div>
+                </div>
+
+                <!-- Code Display -->
+                <div class="code-section" id="code-section">
+                    <div class="code-placeholder" id="code-placeholder">
+                        <p>✨ Awaiting your algorithm…</p>
+                        <p class="hint">Submit an algorithm and the generated code will appear here.</p>
+                    </div>
+                    <pre id="code-pre" class="hidden"><code id="perfect-code" class="language-python"></code></pre>
+                </div>
+
+                <!-- Output Console -->
+                <div class="console-section">
+                    <div class="console-header">
+                        <span>▶ Execution Console</span>
+                        <button id="clear-console-btn" class="mini-btn">Clear</button>
+                    </div>
+                    <div id="output-area">
+                        <pre id="output-text" class="output-idle">$ Ready — click ▶ Run or say "Run"</pre>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- ===== CONTROL DOCK ===== -->
+        <div class="control-dock">
+            <select id="language-select" title="Select language">
+                <option value="python">🐍 Python</option>
+                <option value="javascript">🌐 JavaScript</option>
+                <option value="java">☕ Java</option>
+                <option value="cpp">⚙️ C++</option>
+                <option value="c">🔧 C</option>
+                <option value="typescript">🔷 TypeScript</option>
+                <option value="go">🐹 Go</option>
+                <option value="ruby">💎 Ruby</option>
+                <option value="php">🐘 PHP</option>
+                <option value="rust">🦀 Rust</option>
+                <option value="shell">🖥️ Shell</option>
+                <option value="sql">🗄️ SQL</option>
+            </select>
+
+            <div class="input-wrapper">
+                <textarea id="algorithm-input"
+                    placeholder="💬 Type or speak your algorithm / pseudocode here…  (e.g. 'Start → Input A, B → C = A+B → Print C → Stop')"></textarea>
+            </div>
+
+            <div class="dock-actions">
+                <button id="listen-btn" class="btn-voice"
+                    title="Hold to speak your algorithm (or say 'Submit' / 'Run')">
+                    🎤 <span id="listen-label">Speak</span>
+                </button>
+                <button id="submit-btn" class="btn-evaluate">⚡ Evaluate</button>
+            </div>
+        </div>
+
+        <!-- ===== START SESSION OVERLAY ===== -->
+        <div id="start-overlay">
+            <div class="start-card">
+                <div class="start-avatar-icon">🤖</div>
+                <h2>AlgoAI Instructor</h2>
+                <p>Your personal AI algorithm mentor.<br>Get instant feedback, code generation, and voice-guided
+                    learning.</p>
+                <ul class="start-features">
+                    <li>🎤 Voice input &amp; voice commands</li>
+                    <li>💻 Code in 12+ languages</li>
+                    <li>🤖 Avatar explains your mistakes</li>
+                    <li>▶ Run &amp; see output</li>
+                </ul>
+                <button id="start-btn" onclick="document.getElementById('start-overlay').style.display='none';">🚀 Start
+                    Session</button>
+            </div>
+        </div>
+
+        <!-- ===== MODULE CONTENT MODAL ===== -->
+        <div id="module-modal" class="modal hidden">
+            <div class="modal-content">
+                <button class="close-modal" id="close-modal">&times;</button>
+                <div id="video-player-container" class="hidden">
+                    <iframe id="video-iframe" src="" frameborder="0" allowfullscreen></iframe>
+                    <div class="modal-actions">
+                        <button id="mark-complete-btn" class="btn-primary">Mark as Completed</button>
+                    </div>
+                </div>
+                <div id="exam-container" class="hidden">
+                    <div class="exam-header">
+                        <h2 id="exam-title">Exam</h2>
+                        <p id="exam-desc"></p>
+                    </div>
+                    <!-- Logic Input for Exam -->
+                    <div class="exam-body">
+                        <div class="feedback-mini" id="exam-feedback"></div>
+                        <div class="mentor-feedback-box hidden" id="mentor-full-feedback">
+                            <div class="result-badge" id="result-badge">✅ Correct</div>
+                            <p id="feedback-text"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== EMOJI OVERLAY ===== -->
+        <div id="emoji-overlay" class="emoji-overlay hidden">
+            <span id="emoji-content">👏</span>
+        </div>
+
+        <!-- ===== CERTIFICATE MODAL ===== -->
+        <div id="cert-modal" class="modal hidden">
+            <div class="modal-content cert-congratulations">
+                <div class="cert-icon">🏆</div>
+                <h2>Congratulations!</h2>
+                <p>You have successfully completed all modules and exams in the <strong>Algorithm Logic</strong> course.
+                </p>
+                <button id="claim-cert-btn" class="claim-cert-btn">
+                    <span class="icon">🎓</span> Download Your Certificate
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="main.js"></script>
+</body>
+
+</html>

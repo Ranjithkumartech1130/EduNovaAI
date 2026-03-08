@@ -1,0 +1,37 @@
+[
+    {
+        "id": 1,
+        "type": "video",
+        "title": "Introduction to Algorithms",
+        "description": "Learn what algorithms are and why they matter.",
+        "videoUrl": "https://www.youtube.com/embed/0IAPZzGSbME"
+    },
+    {
+        "id": 2,
+        "type": "video",
+        "title": "Time Complexity & Big O",
+        "description": "Understanding how to measure algorithm efficiency.",
+        "videoUrl": "https://www.youtube.com/embed/v4cd1O4zkGw"
+    },
+    {
+        "id": 3,
+        "type": "exam",
+        "title": "Basic Logic Challenge",
+        "description": "Create an algorithm to find the maximum of two numbers.",
+        "required_algorithm": "find_max"
+    },
+    {
+        "id": 4,
+        "type": "video",
+        "title": "Linear Search Explained",
+        "description": "How to search through a list sequentially.",
+        "videoUrl": "https://www.youtube.com/embed/4gpqV_itMTo"
+    },
+    {
+        "id": 5,
+        "type": "exam",
+        "title": "Search Logic Challenge",
+        "description": "Write a pseudocode for a Linear Search algorithm.",
+        "required_algorithm": "linear_search"
+    }
+]
